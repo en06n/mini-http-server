@@ -2,7 +2,7 @@ use std::fs; // index.htmlなどのソースを読み込むためのライブラ
 use std::io::{Read, Write};
 use std::net::TcpStream; // TcpListener・TcpStream：Rust標準ライブラリにある構造体
 
-// pub を使えないとmain.rsで使えない
+// pubをつけないと、main.rsでhandle_client関数を使用できない
 pub fn handle_client(mut stream: TcpStream) {
     // クライアントから送られてきたデータを読み込むためのバッファ
     let mut buffer = [0; 1024];
@@ -36,20 +36,41 @@ pub fn handle_client(mut stream: TcpStream) {
                 println!("=== GET ===");
                 println!("Retrieve resource");
 
-                let html =
-                    fs::read_to_string("static/index.html").expect("Failed to read index.html");
-                // ヘッダとボディ
-                // format!：作った文字列を変数に入れるマクロ（コンパイル時にコードが生成される）
-                let response = format!(
-                    "HTTP/1.1 200 OK\r\n\
+                let response =
+                // パスがfeedの場合はAtom文書を返す
+                if *path == "/feed" {
+                    // Atom XMLを作る
+                    // HTTPレスポンスとして返す
+                    let atom = fs::read_to_string("static/atom-feed.xml")
+                        .expect("Failed to read atom-feed.xml");
+                    // ヘッダとボディ
+                    // format!：作った文字列を変数に入れるマクロ（コンパイル時にコードが生成される）
+                    format!(
+                        "HTTP/1.1 200 OK\r\n\
+                    Content-Type: application/atom+xml; charset=utf-8\r\n\
+                    Content-Length: {}\r\n\
+                    \r\n\
+                    {}",
+                        atom.len(), // 1つ目の{}に入る
+                        atom        // 2つ目の{}に入る
+                    )
+                }
+                // 想定していないパスならindex.htmlを返す
+                else {
+                    let html =
+                        fs::read_to_string("static/index.html").expect("Failed to read index.html");
+                    // ヘッダとボディ
+                    // format!：作った文字列を変数に入れるマクロ（コンパイル時にコードが生成される）
+                    format!(
+                        "HTTP/1.1 200 OK\r\n\
                     Content-Type: text/html\r\n\
                     Content-Length: {}\r\n\
                     \r\n\
                     {}",
-                    html.len(), // 1つ目の{}に入る
-                    html        // 2つ目の{}に入る
-                );
-
+                        html.len(), // 1つ目の{}に入る
+                        html        // 2つ目の{}に入る
+                    )
+                };
                 // streamに渡す
                 stream
                     .write_all(response.as_bytes()) // 8ビット符号なし整数（unsigned 8-bit integer）
